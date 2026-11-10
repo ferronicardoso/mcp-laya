@@ -148,6 +148,8 @@ The model is loaded lazily on the first call (unless `LAYA_PRELOAD=true`) and sh
 LAYA_MODEL_DIR=~/models/laya-onnx/multilingual npx github:ferronicardoso/mcp-laya
 ```
 
+> **Why `ONNXRUNTIME_NODE_INSTALL=skip`?** On its first install `npx` runs the `postinstall` of `onnxruntime-node`, which downloads ~280 MB of CUDA libraries that this CPU-only server never uses. On a cold cache that pushes the first start past the 30 s connection timeout of MCP clients (measured: ~33 s without it, ~15 s with it). The variable only matters while the package is being installed; later starts take ~2 s.
+
 ### Claude Code (CLI)
 
 ```bash
@@ -169,6 +171,7 @@ The model directory is passed with an `--env` flag before the `--`:
 ```bash
 claude mcp add laya --scope user \
   --env LAYA_MODEL_DIR=/home/you/models/laya-onnx/multilingual \
+  --env ONNXRUNTIME_NODE_INSTALL=skip \
   -- npx -y github:ferronicardoso/mcp-laya
 ```
 
@@ -177,6 +180,7 @@ claude mcp add laya --scope user \
 ```powershell
 claude mcp add laya --scope user `
   --env LAYA_MODEL_DIR=C:\models\laya-onnx\multilingual `
+  --env ONNXRUNTIME_NODE_INSTALL=skip `
   -- npx -y github:ferronicardoso/mcp-laya
 ```
 
@@ -189,6 +193,7 @@ To use a local clone instead of `npx` (see [Local Development](#local-developmen
 ```bash
 codex mcp add laya \
   --env LAYA_MODEL_DIR=/home/you/models/laya-onnx/multilingual \
+  --env ONNXRUNTIME_NODE_INSTALL=skip \
   npx -- -y github:ferronicardoso/mcp-laya
 ```
 
@@ -197,6 +202,7 @@ codex mcp add laya \
 ```powershell
 codex mcp add laya `
   --env LAYA_MODEL_DIR=C:\models\laya-onnx\multilingual `
+  --env ONNXRUNTIME_NODE_INSTALL=skip `
   npx -- -y github:ferronicardoso/mcp-laya
 ```
 
@@ -213,7 +219,8 @@ This registers the server in `~/.codex/config.toml`. To remove it, run `codex mc
       "command": "npx",
       "args": ["github:ferronicardoso/mcp-laya"],
       "env": {
-        "LAYA_MODEL_DIR": "C:\\models\\laya-onnx\\multilingual"
+        "LAYA_MODEL_DIR": "C:\\models\\laya-onnx\\multilingual",
+        "ONNXRUNTIME_NODE_INSTALL": "skip"
       }
     }
   }
@@ -231,7 +238,8 @@ This registers the server in `~/.codex/config.toml`. To remove it, run `codex mc
       "command": "npx",
       "args": ["github:ferronicardoso/mcp-laya"],
       "env": {
-        "LAYA_MODEL_DIR": "/home/you/models/laya-onnx/multilingual"
+        "LAYA_MODEL_DIR": "/home/you/models/laya-onnx/multilingual",
+        "ONNXRUNTIME_NODE_INSTALL": "skip"
       }
     }
   }
@@ -348,6 +356,7 @@ git add dist
 | `LAYA_MODEL_DIR ... is missing: encoder.onnx, ...` | The directory is not the ONNX export (e.g. it is the raw Hugging Face download). Run the export in [Preparing the model](#preparing-the-model) |
 | Export fails or weights look empty; `model.safetensors` is ~134 bytes | `git-lfs` was not working when the Hugging Face repo was cloned, so the file is a pointer. Use `--repo` (downloads the weights) or run `git lfs pull` |
 | Client shows `CONNECTION_CLOSED` | Run the server by hand to see the startup error: `LAYA_MODEL_DIR=... node dist/index.js`. A configuration error is printed to the terminal |
+| `connection timed out after 30000ms` right after registering via `npx` | First `npx` run is installing (slow). Add `ONNXRUNTIME_NODE_INSTALL=skip` to the registration, or warm the cache once in a terminal (`LAYA_MODEL_DIR=... npx -y github:ferronicardoso/mcp-laya`, then `Ctrl+C`) and reconnect. As a last resort start the client with a larger `MCP_TIMEOUT` (ms) |
 | First call takes a few seconds | The model loads lazily on the first call (~5 s). Set `LAYA_PRELOAD=true` to load at startup |
 | Answer comes with a truncation warning | The text exceeds the model's token budget; only the beginning was evaluated. Split the text or shorten it |
 
