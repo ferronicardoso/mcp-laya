@@ -10,6 +10,16 @@ export interface RawAnswer {
     legend?: Record<string, string>;
     confidence?: number;
     answer_confidence?: number;
+    reliability?: RawReliability;
+    [k: string]: unknown;
+}
+/** Report produced by laya-ts' OptionStabilityHook for a choice answer. */
+export interface RawReliability {
+    soft_stability: number | null;
+    stability: number | null;
+    n_variants: number;
+    distinct_choices: string[];
+    variant_choices: Record<string, string | null>;
     [k: string]: unknown;
 }
 export interface RawResult {
@@ -31,12 +41,18 @@ export interface ModelInfo {
     encoder?: string;
     temperature?: unknown;
 }
+export interface PredictCallOptions {
+    /** Re-ask every choice question with reordered / relabeled options and report whether the answer holds. */
+    checkStability?: boolean;
+}
 export interface DecisionEngine {
-    predict(text: string, questions: Record<string, LayaQuestionDef>): Promise<RawResult>;
+    predict(text: string, questions: Record<string, LayaQuestionDef>, options?: PredictCallOptions): Promise<RawResult>;
     info(): Promise<ModelInfo>;
 }
 interface LayaAgentLike {
-    predict(state: unknown, questions: Record<string, LayaQuestionDef>): Promise<RawResult>;
+    predict(state: unknown, questions: Record<string, LayaQuestionDef>, options?: {
+        hooks?: unknown[];
+    }): Promise<RawResult>;
 }
 /**
  * Lazily loads the ONNX model on first use and serializes predictions
@@ -50,7 +66,7 @@ export declare class LayaEngine implements DecisionEngine {
     constructor(config: LayaConfig);
     /** Starts (or awaits) the model load. */
     load(): Promise<LayaAgentLike>;
-    predict(text: string, questions: Record<string, LayaQuestionDef>): Promise<RawResult>;
+    predict(text: string, questions: Record<string, LayaQuestionDef>, options?: PredictCallOptions): Promise<RawResult>;
     info(): Promise<ModelInfo>;
 }
 export {};

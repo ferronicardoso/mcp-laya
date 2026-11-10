@@ -32,9 +32,15 @@ export class LayaEngine {
         }
         return this.agent;
     }
-    async predict(text, questions) {
+    async predict(text, questions, options) {
         const run = async () => {
             const agent = await this.load();
+            if (options?.checkStability) {
+                const { OptionStabilityHook } = await import('../vendor/laya-ts/dist/index.js');
+                // Uncalibrated on purpose (accept/escalate null): we report the raw signal, not a decision.
+                const hook = new OptionStabilityHook({ accept: null, escalate: null, variants: 'fast' });
+                return agent.predict(text, questions, { hooks: [hook] });
+            }
             return agent.predict(text, questions);
         };
         const result = this.queue.then(run, run);

@@ -22,7 +22,7 @@ Typical uses: ticket/email routing, intent and category classification, triage, 
 
 | Tool | Description |
 |---|---|
-| `laya_choice` | Picks exactly one of N options (2–100, ideally < 20); returns the choice and every option's probability |
+| `laya_choice` | Picks exactly one of N options (2–100, ideally < 20); returns the choice and every option's probability. Optional `checkStability` re-asks with the options reordered/relabeled and flags answers that flip |
 | `laya_noul` | Yes/no check phrased as a statement; returns the probability that it is true |
 | `laya_score` | Ordinal scale you define (2–10 levels); returns expected level and per-level probabilities. Weakest type — prefer `laya_choice` with named levels |
 | `laya_predict` | Several choice/score/yes-no questions about the same text in one call (cheaper than separate calls) |
@@ -54,12 +54,30 @@ Example (`laya_choice`):
 }
 ```
 
+### Checking stability (`checkStability`)
+
+A choice can depend on the order in which the options are listed. In testing, a thank-you note was rated "urgent" (79%) with `urgente` listed last, and "can wait" (63%) with the order reversed. With `checkStability: true` (on `laya_choice` or `laya_predict`) the server re-asks every choice question with reordered and relabeled options (laya-ts' `OptionStabilityHook`, `fast` variants, ~3x the compute) and adds:
+
+```json
+"stability": {
+  "stable": false,
+  "agreement": 0,
+  "score": 0.35,
+  "variants": 3,
+  "distinctChoices": ["pode esperar", "urgente"],
+  "variantChoices": { "original": "urgente", "reversed": "pode esperar", "letters_reversed": "pode esperar" }
+}
+```
+
+plus a warning when the answer flips. `stable` is true only if every arrangement gives the same choice. `score` and `agreement` are raw signals, **not calibrated probabilities**: no accept/escalate thresholds are applied. Recommended for urgency/priority-style choices; it does not fix answers that are consistently wrong (e.g. a department that is confidently misread in every order).
+
 If the text exceeds the model's token budget (about 1,024 tokens), `usage.truncated` is `true` and a warning is returned.
 
 ## Know the limits
 
 These come from the checkpoint itself (see its model card) and from manual tests; the MCP surfaces them rather than hiding them:
 
+- **Answers can depend on option order**, especially for urgency/priority choices: use `checkStability` (see above) and treat an unstable answer as unreliable.
 - **Probabilities are uncalibrated** (temperature 1.0) and over-confident. Use them to rank options or to set a review threshold validated on your own data (for example, send to a human when the top probability is below ~0.6), not as true likelihoods.
 - **`noul` can under-report "true"**, and wording matters. In a quick test, "Does the customer show interest in buying?" scored 0.10 on a clear price inquiry, while the declarative "The customer asks about prices." scored 0.92. Phrase `noul` as a short statement about the text and treat values near 0.5 as inconclusive.
 - **`score` is the weakest decision type** and has a measured bias against the first level: a text saying "no rush" was rated "critical" (62%) with only 2% on the lowest level. For urgency, sentiment and similar scales, prefer `laya_choice` with named levels (e.g. `urgent` / `can wait`), which got both test cases right. The fractional `score` is still usable as a relative ranking.

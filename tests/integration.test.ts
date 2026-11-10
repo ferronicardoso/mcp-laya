@@ -36,3 +36,25 @@ test('real model: classifies a Portuguese billing email', { skip, timeout: 120_0
   assert.equal(batch.answers.dept.type, 'choice');
   assert.equal(batch.answers.urgencia.type, 'score');
 });
+
+test('real model: checkStability flags the order-sensitive urgency case and keeps a stable one', { skip, timeout: 120_000 }, async () => {
+  const engine = new LayaEngine(loadConfig());
+  const options = [
+    { key: 'pode esperar', description: 'sem pressa, pode ser respondido com calma' },
+    { key: 'normal', description: 'deve ser respondido em prazo normal' },
+    { key: 'urgente', description: 'precisa de resposta imediata, problema bloqueante' },
+  ];
+  const unstable = await layaChoice(engine, {
+    text: 'Muito obrigado pela ajuda de ontem, o problema foi resolvido e o atendimento foi ótimo!',
+    question: 'Qual a urgência deste ticket?', options, checkStability: true,
+  });
+  assert.equal(unstable.stability?.stable, false);
+  assert.ok(unstable.warnings?.some((w) => /unreliable/.test(w)));
+
+  const stable = await layaChoice(engine, {
+    text: 'Sistema fora do ar, ninguém consegue emitir nota fiscal e estamos parados desde cedo! Precisamos de ajuda agora.',
+    question: 'Qual a urgência deste ticket?', options, checkStability: true,
+  });
+  assert.equal(stable.choice, 'urgente');
+  assert.equal(stable.stability?.stable, true);
+});

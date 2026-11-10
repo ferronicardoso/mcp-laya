@@ -13,6 +13,17 @@ export interface RawAnswer {
   legend?: Record<string, string>;
   confidence?: number;
   answer_confidence?: number;
+  reliability?: RawReliability;
+  [k: string]: unknown;
+}
+
+/** Report produced by laya-ts' OptionStabilityHook for a choice answer. */
+export interface RawReliability {
+  soft_stability: number | null;
+  stability: number | null;
+  n_variants: number;
+  distinct_choices: string[];
+  variant_choices: Record<string, string | null>;
   [k: string]: unknown;
 }
 
@@ -37,13 +48,26 @@ export interface ModelInfo {
   temperature?: unknown;
 }
 
+export interface PredictCallOptions {
+  /** Re-ask every choice question with reordered / relabeled options and report whether the answer holds. */
+  checkStability?: boolean;
+}
+
 export interface DecisionEngine {
-  predict(text: string, questions: Record<string, LayaQuestionDef>): Promise<RawResult>;
+  predict(
+    text: string,
+    questions: Record<string, LayaQuestionDef>,
+    options?: PredictCallOptions
+  ): Promise<RawResult>;
   info(): Promise<ModelInfo>;
 }
 
 interface LayaAgentLike {
-  predict(state: unknown, questions: Record<string, LayaQuestionDef>): Promise<RawResult>;
+  predict(
+    state: unknown,
+    questions: Record<string, LayaQuestionDef>,
+    options?: { hooks?: unknown[] }
+  ): Promise<RawResult>;
 }
 
 /**
@@ -78,9 +102,19 @@ export class LayaEngine implements DecisionEngine {
     return this.agent;
   }
 
-  async predict(text: string, questions: Record<string, LayaQuestionDef>): Promise<RawResult> {
+  async predict(
+    text: string,
+    questions: Record<string, LayaQuestionDef>,
+    options?: PredictCallOptions
+  ): Promise<RawResult> {
     const run = async () => {
       const agent = await this.load();
+      if (options?.checkStability) {
+        const { OptionStabilityHook } = await import('../vendor/laya-ts/dist/index.js');
+        // Uncalibrated on purpose (accept/escalate null): we report the raw signal, not a decision.
+        const hook = new OptionStabilityHook({ accept: null, escalate: null, variants: 'fast' });
+        return agent.predict(text, questions, { hooks: [hook] });
+      }
       return agent.predict(text, questions);
     };
     const result = this.queue.then(run, run);

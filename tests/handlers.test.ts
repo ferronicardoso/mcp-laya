@@ -96,3 +96,67 @@ test('layaStatus includes the calibration caveat', async () => {
   assert.equal(out.loaded, true);
   assert.match(out.calibration, /uncalibrated/);
 });
+
+test('layaChoice with checkStability forwards the flag and reports an unstable answer', async () => {
+  const seen: Array<{ checkStability?: boolean } | undefined> = [];
+  const engine: DecisionEngine = {
+    async predict(_text, _questions, options) {
+      seen.push(options);
+      return {
+        answers: {
+          answer: {
+            type: 'choice', choice: 'urgente',
+            probabilities: { urgente: 0.79, 'pode esperar': 0.21 }, answer_confidence: 0.79,
+            reliability: {
+              soft_stability: 0.35, stability: 0, n_variants: 3,
+              distinct_choices: ['pode esperar', 'urgente'],
+              variant_choices: { original: 'urgente', reversed: 'pode esperar', letters_reversed: 'pode esperar' },
+            },
+          },
+        },
+      };
+    },
+    async info() {
+      return { modelDir: '/m', loaded: true };
+    },
+  };
+  const out = await layaChoice(engine, {
+    text: 'Muito obrigado pela ajuda!', question: 'Urgência?', options: ['pode esperar', 'urgente'], checkStability: true,
+  });
+  assert.deepEqual(seen[0], { checkStability: true });
+  assert.equal(out.stability?.stable, false);
+  assert.equal(out.stability?.agreement, 0);
+  assert.deepEqual(out.stability?.distinctChoices, ['pode esperar', 'urgente']);
+  assert.match(out.warnings?.[0] ?? '', /unreliable/);
+});
+
+test('checkStability is off by default and stable answers add no warning', async () => {
+  const seen: unknown[] = [];
+  const engine: DecisionEngine = {
+    async predict(_t, _q, options) {
+      seen.push(options);
+      return {
+        answers: {
+          answer: {
+            type: 'choice', choice: 'a', probabilities: { a: 0.9, b: 0.1 }, answer_confidence: 0.9,
+            reliability: { soft_stability: 0.85, stability: 1, n_variants: 3, distinct_choices: ['a'], variant_choices: { original: 'a' } },
+          },
+        },
+      };
+    },
+    async info() {
+      return { modelDir: '/m', loaded: true };
+    },
+  };
+  await layaChoice(engine, { text: 't', question: 'q', options: ['a', 'b'] });
+  assert.equal(seen[0], undefined);
+  const out = await layaChoice(engine, { text: 't', question: 'q', options: ['a', 'b'], checkStability: true });
+  assert.equal(out.stability?.stable, true);
+  assert.equal(out.warnings, undefined);
+});
+
+test('layaPredict warns when checkStability is requested without choice questions', async () => {
+  const { engine } = fakeEngine({ answers: { q1: { type: 'noul', noul: 0.1 } } });
+  const out = await layaPredict(engine, { text: 't', questions: [{ type: 'noul', question: 'x?' }], checkStability: true });
+  assert.match(out.warnings?.[0] ?? '', /only applies to choice/);
+});

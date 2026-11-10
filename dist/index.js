@@ -28,6 +28,10 @@ const OPTIONS_PROP = {
         ],
     },
 };
+const STABILITY_PROP = {
+    type: 'boolean',
+    description: 'Re-ask the choice question(s) with the options reordered/relabeled (about 3x the compute) and report whether the answer holds: `stability.stable` is false when it flips, and a warning is added. Recommended for urgency/priority-style choices, whose answers were seen to depend on option order. Default false.',
+};
 const LEVELS_PROP = {
     type: 'array',
     description: 'Description of each level of the scale, lowest level first (2 to 10 levels).',
@@ -45,13 +49,14 @@ export function createServer(engine) {
         tools: [
             {
                 name: 'laya_choice',
-                description: 'Classifies a text into exactly one of the given options using the local Laya decision model (single forward pass, no text generation). Returns the chosen option and the probability of each option. Good for routing, triage, intent and category classification.',
+                description: 'Classifies a text into exactly one of the given options using the local Laya decision model (single forward pass, no text generation). Returns the chosen option and the probability of each option. Good for routing, triage, intent and category classification. For urgency/priority-style choices set checkStability=true: the answer was seen to flip with option order, and this detects it.',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         text: TEXT_PROP,
                         question: { type: 'string', description: 'The question to answer about the text (e.g. "Which team should handle this?")' },
                         options: OPTIONS_PROP,
+                        checkStability: STABILITY_PROP,
                     },
                     required: ['text', 'question', 'options'],
                 },
@@ -103,6 +108,7 @@ export function createServer(engine) {
                                 required: ['type', 'question'],
                             },
                         },
+                        checkStability: STABILITY_PROP,
                     },
                     required: ['text', 'questions'],
                 },
