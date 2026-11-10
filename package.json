@@ -1,0 +1,35 @@
+{
+  "name": "mcp-laya",
+  "version": "1.0.0",
+  "description": "MCP server exposing the Laya decision model (typed choice / score / yes-no decisions over text, local ONNX inference)",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "mcp-laya": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc",
+    "prepare": "npm run build",
+    "hooks:install": "husky",
+    "precommit:build": "npm run build && git add dist",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "test": "tsc -p tsconfig.test.json && node -e \"require('fs').cpSync('vendor','dist-test/vendor',{recursive:true})\" && node --test dist-test/tests/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "express": "^5.2.1",
+    "onnxruntime-node": "^1.31.1"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

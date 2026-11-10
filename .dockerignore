@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-test
+.git
+.github
+.husky
+*.log
+.env*
+.mcp.json
+README.md
